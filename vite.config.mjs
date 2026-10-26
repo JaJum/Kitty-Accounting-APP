@@ -11,6 +11,14 @@ export default defineConfig({
       main: {
         // 后台管家（主进程）的入口文件
         entry: 'electron/main.js',
+        vite: {
+          build: {
+            rollupOptions: {
+              // better-sqlite3 是原生模块，不能打包进代码，运行时直接取用
+              external: ['better-sqlite3'],
+            },
+          },
+        },
       },
       preload: {
         // 传话筒（后台与界面之间的安全通道）
