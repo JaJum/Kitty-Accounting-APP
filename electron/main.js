@@ -1,20 +1,17 @@
 import { app, BrowserWindow } from 'electron'
-import { createRequire } from 'node:module'
-import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
-const require = createRequire(import.meta.url)
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
+// 工程根目录（开发和打包后都有效）
+const APP_ROOT = app.getAppPath()
 
-// 工程根目录
-process.env.APP_ROOT = path.join(__dirname, '..')
+process.env.APP_ROOT = APP_ROOT
 
 export const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
-export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron')
-export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist')
+export const MAIN_DIST = path.join(APP_ROOT, 'dist-electron')
+export const RENDERER_DIST = path.join(APP_ROOT, 'dist')
 
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
-  ? path.join(process.env.APP_ROOT, 'public')
+  ? path.join(APP_ROOT, 'public')
   : RENDERER_DIST
 
 let win
@@ -29,11 +26,11 @@ function createWindow() {
     minHeight: 600,
     webPreferences: {
       // 界面不能直接碰数据库，必须通过这个"传话筒"
-      preload: path.join(__dirname, 'preload.mjs'),
+      preload: path.join(MAIN_DIST, 'preload.js'),
     },
   })
 
-  // 测试消息通道（后台管家 → 界面），阶段3起会换成本事数据
+  // 测试消息通道（后台管家 → 界面），阶段3起会换成真实数据
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send('main-process-message', new Date().toLocaleString())
   })

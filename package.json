@@ -2,10 +2,9 @@
   "name": "heimajizhang",
   "private": true,
   "version": "0.1.0",
-  "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
-    "dev": "vite",
+    "dev": "node dev.cjs",
     "build": "vite build && electron-builder",
     "preview": "vite preview"
   },
