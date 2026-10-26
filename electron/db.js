@@ -68,6 +68,7 @@ export function initDb(dbPath) {
     getInfo: () => getInfo(db),
     listCategories: () => listCategories(db),
     addBill: (bill) => addBill(db, bill),
+    updateBill: (id, bill) => updateBill(db, id, bill),
     listBills: () => listBills(db),
     deleteBill: (id) => deleteBill(db, id),
   }
@@ -111,8 +112,8 @@ function listCategories(db) {
   return db.prepare('SELECT * FROM categories ORDER BY id').all()
 }
 
-// 记一笔账：金额以"分"为单位存整数（如 ¥15.00 存 1500）
-function addBill(db, { type, amount, categoryId, date, remark }) {
+// 校验账单输入（记账和改账共用）
+function validateBillInput(db, type, amount, categoryId) {
   if (type !== 'expense' && type !== 'income') {
     throw new Error('收支类型只能是"支出"或"收入"')
   }
@@ -122,6 +123,11 @@ function addBill(db, { type, amount, categoryId, date, remark }) {
   const category = db.prepare('SELECT * FROM categories WHERE id = ?').get(categoryId)
   if (!category) throw new Error('分类不存在')
   if (category.parent_id == null) throw new Error('账单必须挂在二级分类上')
+}
+
+// 记一笔账：金额以"分"为单位存整数（如 ¥15.00 存 1500）
+function addBill(db, { type, amount, categoryId, date, remark }) {
+  validateBillInput(db, type, amount, categoryId)
 
   const result = db.prepare(`
     INSERT INTO bills (type, amount, category_id, date, remark)
@@ -129,6 +135,19 @@ function addBill(db, { type, amount, categoryId, date, remark }) {
   `).run(type, amount, categoryId, date, remark ?? null)
 
   return db.prepare('SELECT * FROM bills WHERE id = ?').get(result.lastInsertRowid)
+}
+
+// 修改一笔账单
+function updateBill(db, id, { type, amount, categoryId, date, remark }) {
+  validateBillInput(db, type, amount, categoryId)
+  const result = db.prepare(`
+    UPDATE bills
+    SET type = ?, amount = ?, category_id = ?, date = ?, remark = ?,
+        updated_at = datetime('now', 'localtime')
+    WHERE id = ?
+  `).run(type, amount, categoryId, date, remark ?? null, id)
+  if (result.changes === 0) throw new Error('要修改的账单不存在')
+  return db.prepare('SELECT * FROM bills WHERE id = ?').get(id)
 }
 
 // 查看账单（带上分类名称，方便界面显示）

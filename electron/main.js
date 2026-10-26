@@ -25,6 +25,7 @@ const db = initDb(path.join(app.getPath('userData'), 'bookkeeping.db'))
 ipcMain.handle('db:info', () => ({ ...db.getInfo(), dbPath: app.getPath('userData') }))
 ipcMain.handle('category:list', () => db.listCategories())
 ipcMain.handle('bill:add', (_event, bill) => db.addBill(bill))
+ipcMain.handle('bill:update', (_event, id, bill) => db.updateBill(id, bill))
 ipcMain.handle('bill:list', () => db.listBills())
 ipcMain.handle('bill:delete', (_event, id) => db.deleteBill(id))
 
