@@ -21,7 +21,7 @@ const tabs = [
     <main class="content">
       <AddBill v-show="activeTab === 'add'" />
       <BillList v-show="activeTab === 'list'" :active="activeTab === 'list'" @go-add="activeTab = 'add'" />
-      <Stats v-show="activeTab === 'stats'" />
+      <Stats v-show="activeTab === 'stats'" :active="activeTab === 'stats'" />
       <Settings v-show="activeTab === 'settings'" />
     </main>
 
