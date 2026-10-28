@@ -67,6 +67,9 @@ export function initDb(dbPath) {
   return {
     getInfo: () => getInfo(db),
     listCategories: () => listCategories(db),
+    addCategory: (payload) => addCategory(db, payload),
+    updateCategory: (id, payload) => updateCategory(db, id, payload),
+    deleteCategory: (id) => deleteCategory(db, id),
     addBill: (bill) => addBill(db, bill),
     updateBill: (id, bill) => updateBill(db, id, bill),
     listBills: () => listBills(db),
@@ -110,6 +113,115 @@ function getInfo(db) {
 
 function listCategories(db) {
   return db.prepare('SELECT * FROM categories ORDER BY id').all()
+}
+
+// ============================================================
+// 分类管理（V1.1）：用户可自建分类；预置分类（is_system=1）完全锁死
+// ============================================================
+
+// 校验分类名字：必填、去首尾空格、限长度
+function normalizeCategoryName(name) {
+  const n = (name ?? '').trim()
+  if (!n) throw new Error('分类名称不能为空')
+  if (n.length > 8) throw new Error('分类名称最多 8 个字')
+  return n
+}
+
+// 同一类型、同一层级下不允许重名（避免用户看着糊涂）
+function ensureNoDuplicate(db, type, parentId, name, excludeId = null) {
+  const row = parentId == null
+    ? db.prepare('SELECT id FROM categories WHERE type = ? AND parent_id IS NULL AND name = ? AND id != ?')
+        .get(type, name, excludeId ?? -1)
+    : db.prepare('SELECT id FROM categories WHERE type = ? AND parent_id = ? AND name = ? AND id != ?')
+        .get(type, parentId, name, excludeId ?? -1)
+  if (row) throw new Error(`这个类型下已经有叫"${name}"的分类了`)
+}
+
+// 新建分类：parentId 为空 = 建一级大类；有值 = 往某个大类下加小类
+function addCategory(db, { type, name, parentId = null, icon = null }) {
+  if (type !== 'expense' && type !== 'income') {
+    throw new Error('收支类型只能是"支出"或"收入"')
+  }
+  const n = normalizeCategoryName(name)
+  if (parentId != null) {
+    const parent = db.prepare('SELECT * FROM categories WHERE id = ?').get(parentId)
+    if (!parent) throw new Error('所选的大类不存在')
+    if (parent.parent_id != null) throw new Error('只能往一级大类下添加小类')
+    if (parent.type !== type) throw new Error('大类的收支类型和小类不一致')
+  }
+  ensureNoDuplicate(db, type, parentId, n)
+
+  // 排到最后：同类型当前最大顺序 +1
+  const maxRow = db.prepare('SELECT MAX(sort_order) AS m FROM categories WHERE type = ?').get(type)
+  const sortOrder = (maxRow.m ?? 0) + 1
+
+  const result = db.prepare(`
+    INSERT INTO categories (name, parent_id, type, icon, sort_order, is_system, status)
+    VALUES (?, ?, ?, ?, ?, 0, 1)
+  `).run(n, parentId, type, icon ?? null, sortOrder)
+
+  return db.prepare('SELECT * FROM categories WHERE id = ?').get(result.lastInsertRowid)
+}
+
+// 修改分类：只允许改"自建"分类的名字和图标；预置分类一律拒绝
+function updateCategory(db, id, { name, icon = null }) {
+  const category = db.prepare('SELECT * FROM categories WHERE id = ?').get(id)
+  if (!category) throw new Error('分类不存在')
+  if (category.is_system === 1) throw new Error('预置分类不能修改')
+
+  const n = normalizeCategoryName(name)
+  ensureNoDuplicate(db, category.type, category.parent_id, n, id)
+
+  db.prepare('UPDATE categories SET name = ?, icon = ? WHERE id = ?')
+    .run(n, icon ?? category.icon, id)
+  return db.prepare('SELECT * FROM categories WHERE id = ?').get(id)
+}
+
+// 删除分类：只允许删"自建"分类；名下已有账单自动改挂到兜底分类，账单永不丢失
+function deleteCategory(db, id) {
+  const category = db.prepare('SELECT * FROM categories WHERE id = ?').get(id)
+  if (!category) throw new Error('分类不存在')
+  if (category.is_system === 1) throw new Error('预置分类不能删除')
+
+  // 兜底分类：支出→其他·未分类；收入→其他收入·其他
+  const fallback = category.type === 'expense'
+    ? db.prepare(`
+        SELECT c.id FROM categories c
+        JOIN categories p ON p.id = c.parent_id
+        WHERE p.name = '其他' AND c.name = '未分类' AND p.type = 'expense'
+      `).get()
+    : db.prepare(`
+        SELECT c.id FROM categories c
+        JOIN categories p ON p.id = c.parent_id
+        WHERE p.name = '其他收入' AND c.name = '其他' AND p.type = 'income'
+      `).get()
+  if (!fallback) throw new Error('找不到兜底分类，已取消删除（请联系开发人员检查数据）')
+
+  let movedBills = 0
+  let deletedChildren = 0
+
+  const remove = db.transaction(() => {
+    // 若删的是大类，把它下面的小类 id 也收集进来一起处理
+    const children = db.prepare('SELECT id FROM categories WHERE parent_id = ?').all(id)
+    const idsToDelete = [id, ...children.map((c) => c.id)]
+    const placeholders = idsToDelete.map(() => '?').join(',')
+
+    // 名下账单（含小类的）全部搬去兜底分类
+    movedBills = db.prepare(`UPDATE bills SET category_id = ? WHERE category_id IN (${placeholders})`)
+      .run(fallback.id, ...idsToDelete).changes
+
+    // 先删小类，再删大类
+    if (children.length > 0) {
+      const childIds = children.map((c) => c.id)
+      const childPlaceholders = childIds.map(() => '?').join(',')
+      deletedChildren = db.prepare(`DELETE FROM categories WHERE id IN (${childPlaceholders})`)
+        .run(...childIds).changes
+    }
+    db.prepare('DELETE FROM categories WHERE id = ?').run(id)
+  })
+  remove()
+
+  return { deleted: true, movedBills, deletedChildren }
 }
 
 // 校验账单输入（记账和改账共用）

@@ -2,6 +2,9 @@
 // 记一笔：切换收支 → 点分类 → 数字键盘输金额 →（改日期/写备注）→ 保存
 import { ref, computed, onMounted, watch } from 'vue'
 
+// active：页面被切到前台时由父组件传入，用来自动刷新分类（新建分类后不用重启）
+const props = defineProps({ active: { type: Boolean, default: false } })
+
 const type = ref('expense') // expense=支出 / income=收入
 const amountStr = ref('') // 用户输入的金额原文，如 "15.5"
 const parents = ref([]) // 当前收支类型的一级分类
@@ -81,6 +84,9 @@ async function save() {
 }
 
 onMounted(loadCategories)
+
+// 切到"记一笔"页时重新拉一遍分类（在设置里新建分类后，切回来立刻能看到）
+watch(() => props.active, (v) => { if (v) loadCategories() })
 </script>
 
 <template>

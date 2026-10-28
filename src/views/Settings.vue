@@ -1,18 +1,27 @@
 <script setup>
-// 设置：数据自检 + 关于
+// 设置：分类管理入口 + 数据自检 + 关于
 import { ref, onMounted } from 'vue'
+import CategoryManager from '../components/CategoryManager.vue'
 
 const dbPath = ref('')
 const billCount = ref(0)
 const categoryCount = ref(0)
 const result = ref('')
+const showManager = ref(false)
 
-onMounted(async () => {
+onMounted(refreshInfo)
+
+async function refreshInfo() {
   const info = await window.ipcRenderer.invoke('db:info')
   dbPath.value = info.dbPath
   billCount.value = info.billCount
   categoryCount.value = info.categoryCount
-})
+}
+
+// 分类管理面板关闭后刷新数字（可能增删过分类）
+async function onManagerChanged() {
+  await refreshInfo()
+}
 
 // 自检：写入一条测试账单并读回
 async function writeTestBill() {
@@ -41,9 +50,15 @@ async function writeTestBill() {
 <template>
   <div class="settings">
     <div class="card">
+      <h3>🎨 分类管理</h3>
+      <div class="row">自己新建分类（两级都可以），自建的可以改名、换图标、删除。预置分类不能改动。</div>
+      <button class="btn" data-testid="open-manager" @click="showManager = true">管理分类</button>
+    </div>
+
+    <div class="card">
       <h3>📁 数据</h3>
       <div class="row">账本文件：<span class="path">{{ dbPath }}\bookkeeping.db</span></div>
-      <div class="row">内置分类：{{ categoryCount }} 个　·　已有账单：{{ billCount }} 条</div>
+      <div class="row">全部分类：{{ categoryCount }} 个　·　已有账单：{{ billCount }} 条</div>
       <button class="btn" @click="writeTestBill">数据自检（写入并读回一条测试账单）</button>
       <div class="result" v-if="result">{{ result }}</div>
     </div>
@@ -54,6 +69,13 @@ async function writeTestBill() {
       <div class="row">所有数据只保存在你自己的电脑上，不联网、不上传。</div>
       <div class="row">打包安装版将在阶段6提供。</div>
     </div>
+
+    <!-- 分类管理全屏面板 -->
+    <CategoryManager
+      v-if="showManager"
+      @close="showManager = false"
+      @changed="onManagerChanged"
+    />
   </div>
 </template>
 
