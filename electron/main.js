@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu } from 'electron'
 import path from 'node:path'
 import { initDb } from './db.js'
 
@@ -67,4 +67,8 @@ app.on('activate', () => {
   }
 })
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  // 去掉英文菜单栏（File/Edit/View…），界面保持中文
+  Menu.setApplicationMenu(null)
+  createWindow()
+})

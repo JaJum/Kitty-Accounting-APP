@@ -1,15 +1,25 @@
 {
-  // 打包配置：把软件做成可安装的 exe / dmg（阶段6 会细化）
+  // 打包配置：把软件做成便携版 exe（用户选定，见 CLAUDE.md 决策10）
   appId: 'com.heimajizhang.app',
   productName: '黑马记账',
   directories: {
     output: 'release',
   },
   files: ['dist/**/*', 'dist-electron/**/*'],
+  // 本机没有编译工具，禁止打包时重新编译原生模块（CLAUDE.md 注意事项5）
+  npmRebuild: false,
+  // 数据库是原生模块，必须从压缩包里拿出来放真实文件（否则读不到）
+  asarUnpack: ['**/node_modules/better-sqlite3/**'],
   win: {
-    target: ['nsis'],
+    target: ['portable'],
+    icon: 'build/icon.ico',
+  },
+  portable: {
+    artifactName: '黑马记账-${version}-便携版.exe',
   },
   mac: {
+    // Mac 打包必须在 Mac 电脑上进行（见《Mac打包说明.md》）
     target: ['dmg'],
+    icon: 'build/icon.png',
   },
 }
