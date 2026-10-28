@@ -1,7 +1,7 @@
 {
   // 打包配置：把软件做成便携版 exe（用户选定，见 CLAUDE.md 决策10）
-  appId: 'com.heimajizhang.app',
-  productName: '黑马记账',
+  appId: 'com.maomaojizhang.app',
+  productName: '猫猫记账',
   directories: {
     output: 'release',
   },
@@ -15,7 +15,7 @@
     icon: 'build/icon.ico',
   },
   portable: {
-    artifactName: '黑马记账-${version}-便携版.exe',
+    artifactName: '猫猫记账-${version}-便携版.exe',
   },
   mac: {
     // Mac 打包必须在 Mac 电脑上进行（见《Mac打包说明.md》）

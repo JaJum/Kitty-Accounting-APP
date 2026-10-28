@@ -65,7 +65,7 @@ async function writeTestBill() {
 
     <div class="card">
       <h3>ℹ️ 关于</h3>
-      <div class="row">黑马记账 v0.1.0（开发预览版）</div>
+      <div class="row">猫猫记账 v0.1.0（开发预览版）</div>
       <div class="row">所有数据只保存在你自己的电脑上，不联网、不上传。</div>
       <div class="row">打包安装版将在阶段6提供。</div>
     </div>

@@ -1,9 +1,33 @@
 import { app, BrowserWindow, ipcMain, Menu } from 'electron'
 import path from 'node:path'
+import fs from 'node:fs'
 import { initDb } from './db.js'
 
-// 应用名字（决定用户数据目录的名字：C:\Users\你\AppData\Roaming\黑马记账\）
-app.setName('黑马记账')
+// 应用名字（决定用户数据目录的名字：C:\Users\你\AppData\Roaming\猫猫记账\）
+app.setName('猫猫记账')
+
+// 数据搬家：2026-10-28 软件由"黑马记账"改名"猫猫记账"，数据目录跟着改名，
+// 把旧文件夹里的账本复制过来（只搬一次，搬完旧文件保留作备份，绝不丢账）
+function migrateOldData() {
+  try {
+    const newDir = app.getPath('userData')
+    const newDb = path.join(newDir, 'bookkeeping.db')
+    if (fs.existsSync(newDb)) return // 新家已有账本，不用搬
+    const oldDir = path.join(path.dirname(newDir), '黑马记账')
+    const oldDb = path.join(oldDir, 'bookkeeping.db')
+    if (!fs.existsSync(oldDb)) return // 旧家也没有，全新安装，无需搬家
+    fs.mkdirSync(newDir, { recursive: true })
+    // SQLite 的账本其实是 1 个主文件 + 2 个临时小文件，要一起搬
+    for (const f of ['bookkeeping.db', 'bookkeeping.db-wal', 'bookkeeping.db-shm']) {
+      const src = path.join(oldDir, f)
+      if (fs.existsSync(src)) fs.copyFileSync(src, path.join(newDir, f))
+    }
+    console.log('数据搬家完成：旧账本已复制到新目录', newDir)
+  } catch (err) {
+    console.error('数据搬家失败（不影响新建账本）:', err)
+  }
+}
+migrateOldData()
 
 // 工程根目录（开发和打包后都有效）
 const APP_ROOT = app.getAppPath()
@@ -37,7 +61,7 @@ let win
 // 创建窗口：用户看到的那个"电脑窗口"
 function createWindow() {
   win = new BrowserWindow({
-    title: '黑马记账',
+    title: '猫猫记账',
     width: 1100,
     height: 720,
     minWidth: 800,
